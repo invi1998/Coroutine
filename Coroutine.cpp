@@ -23,7 +23,7 @@ struct ReturnObject
 	};
 
 	std::coroutine_handle<> handle;
-	ReturnObject(std::coroutine_handle<> h) : handle(h) {}		// 用于构造 ReturnObject 对象
+	ReturnObject(std::coroutine_handle<> h) : handle{h} {}		// 用于构造 ReturnObject 对象
 
 };
 
@@ -39,13 +39,17 @@ ReturnObject foo()
 }
 
 int main() {
-
-	ReturnObject retObj = foo();		// 调用 foo() 返回一个 ReturnObject 对象句柄，打印 1 hello from foo，然后暂停
+	const ReturnObject retObj = foo();		// 调用 foo() 返回一个 ReturnObject 对象句柄，打印 1 hello from foo，然后暂停
 
 	retObj.handle.resume();				// 继续执行 foo()，打印 2 hello again from foo，然后暂停
 	retObj.handle();					// 调用的是 std::coroutine_handle<>::operator();	打印 3 hello again from foo，然后结束
 
 	// retObj.handle.resume();				// 继续执行 foo()，打印 3 hello again from foo，然后结束
+
+	std::cout << std::boolalpha << retObj.handle.done() << std::endl;		// false
+	// std::boolalpha 用于将 true 和 false 输出为 true 和 false，而不是 1 和 0
+	// 按理说，协程执行完毕后，done() 应该返回 true，但是这里返回 false，这是因为 resume() 会使协程继续执行，直到遇到 co_return 或者结束
+
 
 	return 0;
 }
