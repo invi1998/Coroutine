@@ -43,6 +43,12 @@ struct ReturnObject
 			val_.emplace(val);
 			return std::suspend_always{};
 		}
+
+		[[nodiscard]] double get_data() const noexcept { return data_; }
+		void set_data(double data) noexcept { data_ = data; }
+
+	private:
+		double data_{ 3.14 };
 	};
 
 	std::coroutine_handle<promise_type> handle;
@@ -51,9 +57,17 @@ struct ReturnObject
 
 	int get_val() { return handle.promise().val_.value(); }
 
+
+
 	
 };
 
 // 生成[start, end)区间的整数序列
 ReturnObject invi_generator(int start, int end, int step = 1);
+
+// 数据访问协程
+ReturnObject DataAccessCoro();
+
+// 调用数据访问协程
+double caller();
 

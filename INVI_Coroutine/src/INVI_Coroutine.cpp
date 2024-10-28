@@ -150,6 +150,10 @@ int main() {
 		gen.handle();
 	}
 
+	std::cout << "-------------------\n";
+
+	std::cout << "caller() = " << caller() << std::endl;
+
 	return 0;
 }
 

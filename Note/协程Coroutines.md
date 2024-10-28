@@ -957,3 +957,170 @@ int main() {
    - **`std::suspend_always final_suspend()`**：适用于那些在结束时需要进行异步清理或其他多阶段完成操作的协程。
    
    选择合适的 `final_suspend` 策略可以确保协程在结束时的行为符合你的需求，提高代码的效率和可维护性。
+
+
+
+# 协程访问在调用者中被挂起的协程数据
+
+在 C++20 协程中，协程可以在挂起时保留其状态，这意味着协程的数据可以在挂起和恢复之间保持不变。如果你希望在调用者中访问被挂起的协程的数据，可以通过以下几种方法实现：
+
+### 1. 使用 `promise_type` 访问数据
+
+`promise_type` 是协程的内部状态管理器，可以通过它来存储和访问协程的数据。调用者可以通过 `std::coroutine_handle` 获取 `promise_type` 并访问其中的数据。
+
+#### 示例代码
+
+```cpp
+#include <coroutine>
+#include <iostream>
+#include <optional>
+
+// 定义协程的 promise 类型
+struct MyPromise {
+    std::suspend_never initial_suspend() { return {}; }
+    std::suspend_never final_suspend() noexcept { return {}; }
+    void return_value(int value) { result = value; }
+    void return_void() {}
+    void unhandled_exception() {}
+
+    int result;
+
+    // 提供一个方法来访问协程的数据
+    int get_result() const { return result; }
+};
+
+// 定义协程的返回类型
+using MyTask = std::coroutine_handle<MyPromise>;
+
+// 协程函数
+MyTask my_coroutine() {
+    std::cout << "Starting coroutine..." << std::endl;
+    co_return 42;
+}
+
+// 主函数
+int main() {
+    auto task = my_coroutine();
+    task.resume();
+
+    if (task.done()) {
+        // 通过 promise_type 访问协程的数据
+        int result = task.promise().get_result();
+        std::cout << "Task completed with result: " << result << std::endl;
+    }
+
+    return 0;
+}
+```
+
+### 解释
+
+1. **`MyPromise` 类**:
+   - `initial_suspend` 和 `final_suspend` 控制协程的初始和最终挂起点。
+   - `return_value` 用于设置协程的返回值。
+   - `unhandled_exception` 用于处理未捕获的异常。
+   - `get_result` 方法用于访问协程的内部数据 `result`。
+
+2. **`MyTask` 类型**:
+   - `MyTask` 是 `std::coroutine_handle<MyPromise>` 的别名，用于管理协程的生命周期。
+
+3. **`my_coroutine` 函数**:
+   - 协程函数 `my_coroutine` 计算一个值并使用 `co_return` 返回该值。
+
+4. **主函数**:
+   - 创建协程对象并调用 `resume` 方法来恢复协程的执行。
+   - 检查协程是否完成，并通过 `task.promise().get_result()` 访问协程的内部数据。
+
+### 2. 使用 `std::coroutine_handle` 的 `address` 方法
+
+如果需要在多个地方访问协程的数据，可以将 `std::coroutine_handle` 的地址传递给其他函数或对象，从而在外部访问协程的状态。
+
+#### 示例代码
+
+```cpp
+#include <coroutine>
+#include <iostream>
+#include <optional>
+
+// 定义协程的 promise 类型
+struct MyPromise {
+    std::suspend_never initial_suspend() { return {}; }
+    std::suspend_never final_suspend() noexcept { return {}; }
+    void return_value(int value) { result = value; }
+    void return_void() {}
+    void unhandled_exception() {}
+
+    int result;
+
+    // 提供一个方法来访问协程的数据
+    int get_result() const { return result; }
+};
+
+// 定义协程的返回类型
+using MyTask = std::coroutine_handle<MyPromise>;
+
+// 协程函数
+MyTask my_coroutine() {
+    std::cout << "Starting coroutine..." << std::endl;
+    co_return 42;
+}
+
+// 外部函数，通过 handle 访问协程的数据
+void access_coroutine_data(MyTask task) {
+    if (task.done()) {
+        int result = task.promise().get_result();
+        std::cout << "Accessing result from external function: " << result << std::endl;
+    }
+}
+
+// 主函数
+int main() {
+    auto task = my_coroutine();
+    task.resume();
+
+    if (task.done()) {
+        // 通过 promise_type 访问协程的数据
+        int result = task.promise().get_result();
+        std::cout << "Task completed with result: " << result << std::endl;
+
+        // 通过外部函数访问协程的数据
+        access_coroutine_data(task);
+    }
+
+    return 0;
+}
+```
+
+### 解释
+
+1. **`access_coroutine_data` 函数**:
+   - 该函数接受一个 `MyTask` 对象作为参数，并通过 `task.promise().get_result()` 访问协程的内部数据。
+
+2. **主函数**:
+   - 创建协程对象并调用 `resume` 方法来恢复协程的执行。
+   - 检查协程是否完成，并通过 `task.promise().get_result()` 访问协程的内部数据。
+   - 调用 `access_coroutine_data` 函数，通过外部函数访问协程的数据。
+
+### 总结
+
+- **使用 `promise_type` 访问数据**：通过 `promise_type` 提供的方法，可以在调用者中直接访问协程的内部数据。
+- **使用 `std::coroutine_handle` 的 `address` 方法**：将 `std::coroutine_handle` 的地址传递给其他函数或对象，从而在外部访问协程的状态。
+
+这两种方法都可以有效地在调用者中访问被挂起的协程数据，选择哪种方法取决于你的具体需求和代码结构。
+
+
+
+# 从调用者内部修改协程在其挂起状态下的数据
+
+## 协程外部
+
+## 协程内部
+
+
+
+# 协程挂起或者恢复期间执行同步或者异步调用
+
+
+
+
+
