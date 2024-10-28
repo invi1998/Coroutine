@@ -177,5 +177,115 @@ task<void> h()
 
 
 
+# 为什么不能同时包含 `return_void` 和 `return_value`？
 
+在 C++20 中，协程的设计要求协程的 `promise_type` 必须明确指定其行为，包括如何处理返回值和如何表示没有返回值的情况。这是因为协程的 `promise_type` 需要生成相应的控制块和状态机，以确保协程的正确执行和资源管理。
 
+### 为什么不能同时包含 `return_void` 和 `return_value`？
+
+1. **类型一致性**:
+   - 协程的返回类型必须是确定的。如果一个协程既可以通过 `return_void` 返回空值，又可以通过 `return_value` 返回具体的值，那么编译器将无法确定协程的最终返回类型。
+   - 例如，如果协程的返回类型是 `void`，那么 `return_value` 就没有意义；反之，如果协程的返回类型是一个具体的类型（如 `int`），那么 `return_void` 也没有意义。
+
+2. **语义清晰**:
+   - 协程的设计要求语义清晰。如果一个协程既可以返回值也可以不返回值，那么使用者可能会感到困惑，不知道在什么情况下应该使用哪种返回方式。
+   - 清晰的语义有助于编写更可靠和可维护的代码。
+
+3. **编译器实现**:
+   - 编译器在生成协程的控制块和状态机时，需要知道协程的具体行为。如果一个协程既包含 `return_void` 又包含 `return_value`，编译器将难以生成一致的控制块和状态机。
+   - 编译器需要在编译时确定协程的返回类型和返回行为，以生成正确的代码。
+
+### 如何选择 `return_void` 或 `return_value`？
+
+- **`return_void`**:
+  - 如果协程不需要返回任何值，可以使用 `return_void`。
+  - 例如，一个简单的异步任务可能只需要执行某些操作而不返回结果。
+
+  ```cpp
+  struct MyPromise {
+      std::suspend_never initial_suspend() { return {}; }
+      std::suspend_never final_suspend() noexcept { return {}; }
+      void return_void() {}  // 没有返回值
+      void unhandled_exception() {}
+  };
+  ```
+
+- **`return_value`**:
+  - 如果协程需要返回一个具体的值，可以使用 `return_value`。
+  - 例如，一个异步计算任务可能需要返回计算结果。
+
+  ```cpp
+  struct MyPromise {
+      std::suspend_never initial_suspend() { return {}; }
+      std::suspend_never final_suspend() noexcept { return {}; }
+      int get_return_object() { return 0; }  // 返回值类型为 int
+      void return_value(int value) { result = value; }  // 返回具体的值
+      void unhandled_exception() {}
+      int result;
+  };
+  ```
+
+### 示例代码
+
+下面是一个简单的示例，展示了如何定义一个返回值的协程和一个不返回值的协程：
+
+#### 不返回值的协程
+
+```cpp
+#include <coroutine>
+#include <iostream>
+
+struct NoReturnValuePromise {
+    std::suspend_never initial_suspend() { return {}; }
+    std::suspend_never final_suspend() noexcept { return {}; }
+    void return_void() {}
+    void unhandled_exception() {}
+};
+
+using NoReturnValueTask = std::coroutine_handle<NoReturnValuePromise>;
+
+NoReturnValueTask no_return_value_coroutine() {
+    std::cout << "Executing no_return_value_coroutine" << std::endl;
+    co_return;
+}
+
+int main() {
+    auto task = no_return_value_coroutine();
+    task.resume();
+    return 0;
+}
+```
+
+#### 返回值的协程
+
+```cpp
+#include <coroutine>
+#include <iostream>
+
+struct ReturnValuePromise {
+    std::suspend_never initial_suspend() { return {}; }
+    std::suspend_never final_suspend() noexcept { return {}; }
+    int get_return_object() { return 0; }
+    void return_value(int value) { result = value; }
+    void unhandled_exception() {}
+    int result;
+};
+
+using ReturnValueTask = std::coroutine_handle<ReturnValuePromise>;
+
+ReturnValueTask return_value_coroutine() {
+    std::cout << "Executing return_value_coroutine" << std::endl;
+    co_return 42;
+}
+
+int main() {
+    auto task = return_value_coroutine();
+    task.resume();
+    std::cout << "Result: " << task.promise().result << std::endl;
+    return 0;
+}
+```
+
+### 总结
+
+协程不能同时包含 `return_void` 和 `return_value`，因为这会导致类型不一致和语义模糊。选择合适的返回方式（`return_void` 或 `return_value`）可以使协程的实现更加清晰和可靠。
